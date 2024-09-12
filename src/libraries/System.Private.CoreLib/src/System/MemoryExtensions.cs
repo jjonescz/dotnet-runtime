@@ -2612,6 +2612,7 @@ namespace System
         /// <summary>
         /// Reverses the sequence of the elements in the entire span.
         /// </summary>
+        [OverloadResolutionPriority(-1)]
         public static void Reverse<T>(this Span<T> span)
         {
             if (span.Length > 1)
