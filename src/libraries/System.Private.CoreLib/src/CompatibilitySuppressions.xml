@@ -13,4 +13,10 @@
     <DiagnosticId>CP0002</DiagnosticId>
     <Target>F:System.Resources.ResourceSet.Reader</Target>
   </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0016</DiagnosticId>
+    <Target>M:System.MemoryExtensions.Reverse``1(System.Span{``0}):[T:System.Runtime.CompilerServices.OverloadResolutionPriorityAttribute]</Target>
+    <Left>ref/net9.0/System.Private.CoreLib.dll</Left>
+    <Right>lib/net9.0/System.Private.CoreLib.dll</Right>
+  </Suppression>
 </Suppressions>
