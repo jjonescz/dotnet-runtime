@@ -59,6 +59,7 @@ jobs:
     continueOnError: true
     condition: always()
 
-  - template: /eng/common/core-templates/steps/source-index-stage1-publish.yml
-    parameters:
-      binLogPath: ${{ parameters.binLogPath }}
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+    - template: /eng/common/core-templates/steps/source-index-stage1-publish.yml
+      parameters:
+        binLogPath: ${{ parameters.binLogPath }}
