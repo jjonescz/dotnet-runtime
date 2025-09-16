@@ -51,13 +51,10 @@ jobs:
     continueOnError: true
     condition: always()
 
-  - task: PublishPipelineArtifact@1
-    displayName: Publish Logs
-    inputs:
-      targetPath: '$(Build.SourcesDirectory)/artifacts/log'
-      artifactName: 'SourceIndexStage1 Attempt $(System.JobAttempt) Logs'
-    continueOnError: true
-    condition: always()
+  - template: /eng/common/core-templates/steps/publish-logs.yml
+    parameters:
+      is1ESPipeline: ${{ parameters.is1ESPipeline }}
+      JobLabel: 'Publish_Artifacts_Logs'
 
   - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
     - template: /eng/common/core-templates/steps/source-index-stage1-publish.yml
