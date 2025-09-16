@@ -39,6 +39,26 @@ jobs:
   - script: ${{ parameters.sourceIndexBuildCommand }}
     displayName: Build Repository
 
+  - task: PowerShell@2
+    displayName: Generate Complog
+    inputs:
+      targetType: 'inline'
+      script: |
+        Set-Location -Path "$(Build.SourcesDirectory)\artifacts\log\Debug\"
+        Get-ChildItem -Filter "*.binlog" | ForEach-Object {
+          dnx --yes complog create $_.FullName
+        }
+    continueOnError: true
+    condition: always()
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Logs
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)/artifacts/log'
+      artifactName: 'SourceIndexStage1 Attempt $(System.JobAttempt) Logs'
+    continueOnError: true
+    condition: always()
+
   - template: /eng/common/core-templates/steps/source-index-stage1-publish.yml
     parameters:
       binLogPath: ${{ parameters.binLogPath }}
