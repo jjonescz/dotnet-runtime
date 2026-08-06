@@ -1,0 +1,35 @@
+# Restores (and, via the post-job phase, saves) the Roslyn compiler output cache used by the
+# caching compiler. Mirrors dotnet/roslyn's eng/pipelines/cache-roslyn-outputs.yml.
+#
+# The cache directory is DOTNET_COMPILER_CACHE_PATH (set by the build job). The compiler reads
+# and writes it during the build via the `use-global-cache=<path>` feature enabled in
+# eng/CachingCompiler.props.
+
+parameters:
+  # Build configuration (Debug/Release/Checked) - part of the cache key so configs don't collide.
+  configuration: ''
+  # Extra segment that uniquely identifies the build job (e.g. arch + nameSuffix) so concurrent
+  # jobs get their own cache lane instead of racing on the same key.
+  keySegment: ''
+
+steps:
+- task: Cache@2
+  displayName: Restore compiler output cache
+  inputs:
+    key: '"dotnet-compiler" | "$(Agent.OS)" | "${{ parameters.configuration }}" | "${{ parameters.keySegment }}" | "$(Build.SourceBranch)" | "$(Build.BuildId)"'
+    restoreKeys: |
+      "dotnet-compiler" | "$(Agent.OS)" | "${{ parameters.configuration }}" | "${{ parameters.keySegment }}" | "$(Build.SourceBranch)"
+      "dotnet-compiler" | "$(Agent.OS)" | "${{ parameters.configuration }}" | "${{ parameters.keySegment }}" | "$(System.PullRequest.TargetBranch)"
+      "dotnet-compiler" | "$(Agent.OS)" | "${{ parameters.configuration }}" | "${{ parameters.keySegment }}"
+      "dotnet-compiler" | "$(Agent.OS)" | "${{ parameters.configuration }}"
+    path: $(DOTNET_COMPILER_CACHE_PATH)
+
+- task: PowerShell@2
+  displayName: Record compiler cache build start time
+  continueOnError: true
+  inputs:
+    targetType: 'inline'
+    script: |
+      $buildStart = [System.DateTimeOffset]::UtcNow.ToString("O", [System.Globalization.CultureInfo]::InvariantCulture)
+      Write-Host "Compiler cache build start time: $buildStart"
+      Write-Host "##vso[task.setvariable variable=DotNetCompilerCacheBuildStartTime]$buildStart"

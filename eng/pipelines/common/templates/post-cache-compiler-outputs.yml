@@ -1,0 +1,72 @@
+# Reports compiler-cache statistics and purges entries that were not used by this build so the
+# cache directory does not grow unbounded before it is saved by the Cache@2 post-job step.
+# Best-effort: never fails the build. Mirrors dotnet/roslyn's post-cache-roslyn-outputs.yml,
+# adapted to locate VBCSCompiler.dll from the Microsoft.Net.Compilers.Toolset NuGet package
+# (this repo consumes the compiler as a package rather than building it).
+
+parameters:
+  configuration: ''
+
+steps:
+- task: PowerShell@2
+  displayName: Report and purge compiler output cache
+  continueOnError: true
+  condition: succeededOrFailed()
+  inputs:
+    targetType: 'inline'
+    script: |
+      function Write-AzureDevOpsWarning([string] $message) {
+        Write-Host "##vso[task.logissue type=warning]$message"
+      }
+
+      $buildStart = "$(DotNetCompilerCacheBuildStartTime)"
+      if ([string]::IsNullOrWhiteSpace($buildStart)) {
+        Write-AzureDevOpsWarning "Compiler cache build start time was not recorded. Skipping cache stats and purge."
+        exit 0
+      }
+
+      $cachePath = "$(DOTNET_COMPILER_CACHE_PATH)"
+      if ([string]::IsNullOrWhiteSpace($cachePath) -or -not (Test-Path -LiteralPath $cachePath)) {
+        Write-AzureDevOpsWarning "Compiler cache path was not set or does not exist. Skipping cache stats and purge."
+        exit 0
+      }
+
+      # Locate VBCSCompiler.dll from the restored Microsoft.Net.Compilers.Toolset package.
+      $searchRoots = @(
+        "$env:NUGET_PACKAGES",
+        (Join-Path "$(Build.SourcesDirectory)" ".packages"),
+        (Join-Path "$env:USERPROFILE" ".nuget/packages"),
+        (Join-Path "$env:HOME" ".nuget/packages")
+      ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) }
+
+      $compilerServerPath = $null
+      foreach ($root in $searchRoots) {
+        $toolsetRoot = Join-Path $root "microsoft.net.compilers.toolset"
+        if (Test-Path -LiteralPath $toolsetRoot) {
+          $candidate = Get-ChildItem -LiteralPath $toolsetRoot -Recurse -Filter "VBCSCompiler.dll" -ErrorAction SilentlyContinue |
+            Sort-Object FullName | Select-Object -Last 1
+          if ($null -ne $candidate) {
+            $compilerServerPath = $candidate.FullName
+            break
+          }
+        }
+      }
+
+      if ($null -eq $compilerServerPath) {
+        Write-AzureDevOpsWarning "VBCSCompiler.dll was not found under the NuGet packages folder. Skipping cache stats and purge."
+        exit 0
+      }
+
+      Write-Host "Compiler cache stats since build start ($buildStart):"
+      dotnet exec "$compilerServerPath" "-cachepath:$cachePath" "-cachestats:$buildStart" "-cachestatsverbosity:1"
+      if ($LASTEXITCODE -ne 0) {
+        Write-AzureDevOpsWarning "Failed to show compiler cache stats. Exit code: $LASTEXITCODE"
+      }
+
+      Write-Host "Purging compiler cache entries unused since build start ($buildStart):"
+      dotnet exec "$compilerServerPath" "-cachepath:$cachePath" "-purgecache:$buildStart"
+      if ($LASTEXITCODE -ne 0) {
+        Write-AzureDevOpsWarning "Failed to purge compiler cache. Exit code: $LASTEXITCODE"
+      }
+
+      exit 0

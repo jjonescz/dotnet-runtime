@@ -36,6 +36,11 @@ parameters:
   templatePath: 'templates'
   templateContext: ''
   disableComponentGovernance: ''
+  # Opt this build job into the Roslyn caching compiler (persisted compiler output cache).
+  # Enabled by default for CI; official and source-only builds are excluded in
+  # eng/CachingCompiler.props. Set to false on a specific job to opt out.
+  # See eng/CachingCompiler.props and eng/pipelines/common/templates/cache-compiler-outputs.yml.
+  enableCachingCompiler: true
 
 jobs:
 - template: /eng/common/${{ parameters.templatePath }}/job/job.yml
@@ -141,6 +146,14 @@ jobs:
       - name: MSBUILDDEBUGPATH
         value: $(Build.SourcesDirectory)/artifacts/log/$(_BuildConfig)/MsbuildDebugLogs
 
+      # Enable the Roslyn caching compiler for this job. These variables are surfaced to the
+      # build as environment variables and consumed by eng/CachingCompiler.props.
+      - ${{ if eq(parameters.enableCachingCompiler, true) }}:
+        - name: DOTNET_USE_CACHING_COMPILER
+          value: 'true'
+        - name: DOTNET_COMPILER_CACHE_PATH
+          value: $(Agent.TempDirectory)/dotnet-compiler-cache
+
       - ${{ each variableTemplate in parameters.extraVariablesTemplates }}:
         - template: ${{ variableTemplate.template }}
           parameters:
@@ -218,12 +231,23 @@ jobs:
         - ${{ else }}:
           - ${{ preBuildStep }}
 
+    - ${{ if eq(parameters.enableCachingCompiler, true) }}:
+      - template: /eng/pipelines/common/templates/cache-compiler-outputs.yml
+        parameters:
+          configuration: ${{ parameters.buildConfig }}
+          keySegment: ${{ parameters.archType }}_${{ parameters.osSubgroup }}_${{ parameters.nameSuffix }}
+
     # Build
     - template: /eng/pipelines/common/templates/global-build-step.yml
       parameters:
         buildArgs: ${{ parameters.buildArgs }}
         useContinueOnErrorDuringBuild: ${{ parameters.useContinueOnErrorDuringBuild }}
         shouldContinueOnError: ${{ parameters.shouldContinueOnError }}
+
+    - ${{ if eq(parameters.enableCachingCompiler, true) }}:
+      - template: /eng/pipelines/common/templates/post-cache-compiler-outputs.yml
+        parameters:
+          configuration: ${{ parameters.buildConfig }}
 
     - task: CopyFiles@2
       displayName: Gather CMakeConfigureLog for publish to artifacts

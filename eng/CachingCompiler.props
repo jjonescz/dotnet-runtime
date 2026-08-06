@@ -1,0 +1,32 @@
+<!-- Licensed to the .NET Foundation under one or more agreements. The .NET Foundation licenses this file to you under the MIT license. -->
+<!--
+  Enables the Roslyn compiler's global output cache (the "caching compiler").
+
+  When enabled, the C#/VB compiler keys each compilation on its inputs and reuses a
+  previously produced output instead of recompiling. In CI this lets a persisted cache
+  directory (DOTNET_COMPILER_CACHE_PATH) carry compiler outputs across builds.
+
+  This file is imported from Directory.Build.props only when caching is opted into and
+  the build is not an official build or a source-only build. See the import condition
+  there for details. Mirrors dotnet/roslyn's eng/targets/CachingCompiler.props.
+-->
+<Project>
+
+  <PropertyGroup>
+    <!-- Source Link embeds per-commit source root metadata that adds needless variance to
+         the compiler cache. It is not required for PR/CI builds, so disable it here. -->
+    <EnableSourceLink>false</EnableSourceLink>
+
+    <!-- Turn on the compiler's global output cache. When a persisted cache directory is
+         provided, point the compiler at it; otherwise fall back to the machine-global cache. -->
+    <Features Condition="'$(DOTNET_COMPILER_CACHE_PATH)' == ''">$(Features);use-global-cache</Features>
+    <Features Condition="'$(DOTNET_COMPILER_CACHE_PATH)' != ''">$(Features);use-global-cache=$(DOTNET_COMPILER_CACHE_PATH)</Features>
+
+    <!-- Normalize the repo root out of compiler-visible paths so cache keys match across
+         machines (agents check out to different absolute paths). Preserve any existing PathMap. -->
+    <_CachingCompilerOriginalPathMap>$(PathMap)</_CachingCompilerOriginalPathMap>
+    <PathMap>$(RepoRoot)=/_/</PathMap>
+    <PathMap Condition="'$(_CachingCompilerOriginalPathMap)' != ''">$(RepoRoot)=/_/,$(_CachingCompilerOriginalPathMap)</PathMap>
+  </PropertyGroup>
+
+</Project>

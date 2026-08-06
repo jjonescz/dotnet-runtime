@@ -58,6 +58,14 @@
   <!-- Import the Arcade SDK -->
   <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
 
+  <!-- Opt into the Roslyn caching compiler when requested (e.g. in CI). Excluded from official
+       and source-only builds. Mirrors dotnet/roslyn's CachingCompiler.props import. -->
+  <Import Project="$(MSBuildThisFileDirectory)eng/CachingCompiler.props"
+          Condition="'$(DOTNET_USE_CACHING_COMPILER)' != 'false' and
+                     ('$(DOTNET_USE_CACHING_COMPILER)' == 'true' or '$(DOTNET_COMPILER_CACHE_PATH)' != '') and
+                     '$(DotNetBuildSourceOnly)' != 'true' and
+                     '$(OfficialBuild)' != 'true'" />
+
   <!-- MSBuild parallelism settings for better build performance.
        See https://devblogs.microsoft.com/cppblog/cpp-build-throughput-investigation-and-tune-up/ -->
   <PropertyGroup>
